@@ -1,0 +1,1 @@
+Proyecto realizado con la funcion de autocompletar un archivo de texto ocupando python para leer los tags de un archivo 
