@@ -1,24 +1,26 @@
 from mutagen.flac import FLAC
 import os
 
-class AlbumScanner:
-    def __init__(self, flac_folder, start_range, end_range):
-        self.flac_folder = flac_folder
-        self.start_range = start_range
-        self.end_range = end_range
-        self.albums_info = {} 
-        self.current_album_number = 0
-        self.total_albums_in_range = end_range - start_range + 1
+class AlbumScanner: 
+    def __init__(self):
+        self.albums_info = {}
+        self.album_count = 0
 
-    def scan_albums(self):
-        for root, dirs, files in os.walk(self.flac_folder):
+    def scan_albums(self, flac_folder, start_range, end_range):
+        album_names = set()
+
+        for root, dirs, files in os.walk(flac_folder):
+            album_info = None
             for album_file in files:
                 if album_file.endswith(".flac"):
-                    self.current_album_number += 1
-                    if self.start_range <= self.current_album_number <= self.end_range:
-                        album_info = self.extract_album_info(os.path.join(root, album_file))
-                        if album_info:
-                            self.albums_info[album_info["Album"]] = album_info
+                    album_info = self.extract_album_info(os.path.join(root, album_file))
+                    if album_info:
+                        album_name = album_info["Album"]
+                        if album_name not in album_names:
+                            album_names.add(album_name)
+                            self.album_count += 1
+                            if start_range <= self.album_count <= end_range:
+                                self.albums_info[album_name] = album_info
 
 
     def extract_album_info(self, album_path):
@@ -29,9 +31,15 @@ class AlbumScanner:
                 "Artist": tags.get("artist", [""])[0],
                 "Codec": f"Flac {tags.info.sample_rate // 1000}kHz/{tags.info.bits_per_sample}bit",
                 "Genre": tags.get("genre", [""])[0],
-                "Comment": tags.get("comment", [""])[0],
-                "DiscNumber":f"{self.current_album_number}/{self.total_albums_in_range}",
+                "Comment": tags.get("comment", [""])[0]
             }
+
+            # Extraer la carátula (front cover) si está presente
+            pictures = tags.pictures
+            for p in pictures:
+                if p.type == 3:  # Tipo 3 indica carátula frontal
+                    album_info["CoverArt"] = p.data
+            
             return album_info
         except Exception as e:
             print(f"Error processing {album_path}: {e}")
@@ -58,6 +66,13 @@ class AlbumScanner:
                 file.write("⤵️ Fuente: \n")
                 file.write("🔗 Enlace a drive: \n")
                 file.write("\n")
+
+                # Guardar la carátula en la carpeta del álbum
+                if "CoverArt" in album_info:
+                    cover_path = os.path.join(album_folder, f'{album_name}_cover.jpg')
+                    with open(cover_path, 'wb') as cover_file:
+                        cover_file.write(album_info["CoverArt"])
+                    file.write(f"🖼️ Carátula: {cover_path}\n")
 
 
     def clean_folder_name(self, folder_name):
